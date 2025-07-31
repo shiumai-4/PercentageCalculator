@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>割合計算ツール</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントのインポート */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* 背景色 */
+        }
+        /* スライダーのスタイル */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #4f46e5; /* 紫色 */
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #4f46e5;
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+        }
+        /* カスタムメッセージボックスのスタイル */
+        .message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ef4444; /* 赤色 */
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: none; /* 初期状態では非表示 */
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .message-box.show {
+            display: block;
+            opacity: 1;
+        }
+
+        /* モードボタンの基本スタイルとトランジション */
+        .mode-button {
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+            border: 2px solid transparent; /* デフォルトで透明な枠線 */
+        }
+
+        /* モードボタンの選択状態 */
+        #mode1Btn.selected {
+            background-color: #bfdbfe; /* blue-200 */
+            color: #2563eb; /* blue-700 */
+            border-color: #2563eb; /* blue-700 */
+        }
+        #mode2Btn.selected {
+            background-color: #c7d2fe; /* indigo-200 */
+            color: #4338ca; /* indigo-700 */
+            border-color: #4338ca; /* indigo-700 */
+        }
+        #mode3Btn.selected {
+            background-color: #e9d5ff; /* purple-200 */
+            color: #7c3aed; /* purple-700 */
+            border-color: #7c3aed; /* purple-700 */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-4xl border border-gray-200 relative">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">📊 割合計算ツール</h1>
+
+        <!-- 使い方ボタン -->
+        <button id="helpButton" class="absolute top-4 right-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg shadow-sm hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75">
+            使い方
+        </button>
+
+        <!-- モード選択ボタン -->
+        <div class="flex flex-wrap justify-center gap-3 mb-8">
+            <button id="mode1Btn" class="px-5 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 mode-button">
+                総量と割合から量を算出
+            </button>
+            <button id="mode2Btn" class="px-5 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75 mode-button">
+                割合と1項目から他を算出
+            </button>
+            <button id="mode3Btn" class="px-5 py-2 rounded-lg bg-purple-600 text-white font-semibold shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-75 mode-button">
+                各項目から総量と割合を算出
+            </button>
+        </div>
+
+        <!-- 割合入力形式選択 -->
+        <div class="flex justify-center gap-6 mb-6">
+            <label class="inline-flex items-center">
+                <input type="radio" name="ratioInputType" value="percentage" checked class="form-radio h-5 w-5 text-blue-600" id="radioPercentage">
+                <span class="ml-2 text-gray-700 text-lg font-medium">割合(%)で入力</span>
+            </label>
+            <label class="inline-flex items-center">
+                <input type="radio" name="ratioInputType" value="ratio" class="form-radio h-5 w-5 text-purple-600" id="radioRatio">
+                <span class="ml-2 text-gray-700 text-lg font-medium">比率(x:y)で入力</span>
+            </label>
+        </div>
+
+        <!-- 入力エリア -->
+        <div id="inputArea" class="space-y-6 mb-8">
+            <!-- 総量入力 (モード1, 2で表示) -->
+            <div id="totalInputGroup" class="flex flex-col sm:flex-row items-center gap-4 bg-blue-50 p-4 rounded-lg shadow-sm">
+                <label for="totalQuantity" class="text-lg font-medium text-gray-700 w-24">総量:</label>
+                <!-- focus:ringとfocus:borderのクラスはJSで動的に制御 -->
+                <input type="number" id="totalQuantity" class="flex-grow p-2 border rounded-md text-lg" placeholder="総量を入力">
+                <input type="range" id="totalQuantitySlider" min="0" max="1000" value="100" class="w-full sm:w-48 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <!-- 項目リスト -->
+            <div id="itemsContainer" class="space-y-4">
+                <!-- 項目はJavaScriptで動的に追加されます -->
+            </div>
+
+            <!-- 項目追加ボタン -->
+            <div class="flex justify-center gap-4 mt-6">
+                <button id="addItemBtn" class="px-6 py-3 rounded-lg bg-green-500 text-white font-semibold shadow-md hover:bg-green-600 transition-colors flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    項目を追加
+                </button>
+            </div>
+        </div>
+
+        <!-- 円グラフ表示エリア -->
+        <div class="flex flex-col lg:flex-row items-center justify-center gap-8 mt-8">
+            <div class="w-full lg:w-1/2 flex justify-center">
+                <canvas id="pieChart" class="bg-gray-50 rounded-xl shadow-inner border border-gray-200" width="400" height="400"></canvas>
+            </div>
+            <div id="chartDetails" class="w-full lg:w-1/2 bg-gray-50 p-6 rounded-xl shadow-inner border border-gray-200 text-gray-700 text-lg">
+                <h3 class="text-xl font-semibold mb-4 text-center">円グラフ詳細</h3>
+                <p id="selectedSliceInfo" class="text-center">グラフの項目をクリックすると詳細が表示されます。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- カスタムメッセージボックス -->
+    <div id="messageBox" class="message-box"></div>
+
+    <!-- Modal Structure -->
+    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white p-6 rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+            <button id="closeModalButton" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl font-bold focus:outline-none">
+                &times;
+            </button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">ツールの使い方</h2>
+            <div class="text-gray-700 space-y-4">
+                <p>このツールは、小学生・中学生が割合の計算を楽しく学べるように作られています。</p>
+
+                <h3 class="text-xl font-semibold text-gray-800">1. 計算モードの選択</h3>
+                <p>上部にある3つのボタンで、計算したい内容に合わせてモードを切り替えます。選択中のモードは背景色が薄くなり、文字色が濃くなります。</p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li><strong>総量と割合から量を算出:</strong> 全体の量と各項目の割合（または比率）を入力すると、それぞれの項目の量が計算されます。</li>
+                    <li><strong>割合と1項目から他を算出:</strong> 各項目の割合（または比率）と、いずれか1つの項目の量を入力すると、残りの項目の量と全体の量が計算されます。</li>
+                    <li><strong>各項目から総量と割合を算出:</strong> 各項目の量を入力すると、全体の量とそれぞれの項目の割合（および比率）が計算されます。</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800">2. 割合入力形式の選択</h3>
+                <p>「割合(%)で入力」または「比率(x:y)で入力」のラジオボタンで、割合の入力方法を選べます。</p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li><strong>割合(%)で入力:</strong> 各項目の割合をパーセンテージで直接入力します。合計が100%でない場合は自動調整されます。</li>
+                    <li><strong>比率(x:y)で入力:</strong> 各項目の比率（例: 1, 2, 3など）を個別の数値で入力します。ツールが自動的に全体の比率からパーセンテージを計算します。</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800">3. 数値の入力と調整</h3>
+                <p>選択したモードと入力形式に応じて、入力可能なフィールドが白色になり、直接編集できます。計算結果が表示されるフィールドは灰色になり、直接編集できません。</p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li>数値を直接入力するか、横のスライドバーを動かして調整できます。</li>
+                    <li>入力不可のフィールドを選択（クリック）した場合でも、枠線は灰色で表示されます。</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800">4. 項目の管理</h3>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li>「項目を追加」ボタンで、計算対象の項目を増やせます。</li>
+                    <li>各項目の右端にある「削除」ボタンをクリックすると、その項目のみを削除できます。（最低1項目は必須です。）</li>
+                    <li>各項目の左側にあるテキストボックスで、項目名を自由に設定できます。</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800">5. 結果の確認とグラフ</h3>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li>入力するたびに、計算結果が自動的に更新され、右側の円グラフに表示されます。</li>
+                    <li>円グラフの特定の項目をクリックすると、その項目の具体的な量と割合が「円グラフ詳細」エリアに表示されます。</li>
+                </ul>
+                <p class="mt-4">このツールを使って、割合の計算を楽しくマスターしましょう！</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const mode1Btn = document.getElementById('mode1Btn');
+        const mode2Btn = document.getElementById('mode2Btn');
+        const mode3Btn = document.getElementById('mode3Btn');
+        const modeButtons = document.querySelectorAll('.mode-button'); // 全モードボタンを取得
+
+        const radioPercentage = document.getElementById('radioPercentage');
+        const radioRatio = document.getElementById('radioRatio');
+        const totalInputGroup = document.getElementById('totalInputGroup');
+        const totalQuantityInput = document.getElementById('totalQuantity');
+        const totalQuantitySlider = document.getElementById('totalQuantitySlider');
+        const itemsContainer = document.getElementById('itemsContainer');
+        const addItemBtn = document.getElementById('addItemBtn');
+
+        const pieChartCanvas = document.getElementById('pieChart');
+        const ctx = pieChartCanvas.getContext('2d');
+        pieChartCanvas.slices = []; // Fix: Initialize slices array to prevent TypeError
+
+        const selectedSliceInfo = document.getElementById('selectedSliceInfo');
+        const messageBox = document.getElementById('messageBox');
+
+        // 使い方モーダル関連
+        const helpButton = document.getElementById('helpButton');
+        const helpModal = document.getElementById('helpModal');
+        const closeModalButton = document.getElementById('closeModalButton');
+
+        let currentMode = 1; // 1: 総量と割合から量を算出, 2: 割合と1項目から他を算出, 3: 各項目から総量と割合を算出
+        let currentRatioInputType = 'percentage'; // 'percentage' or 'ratio'
+
+        // items: { id: number, label: string, quantity: number, percentage: number, ratioPart: number }
+        let items = [];
+
+        // 初期項目設定
+        function initializeItems() {
+            items = [
+                { id: 1, label: '項目1', quantity: 0, percentage: 50, ratioPart: 1 },
+                { id: 2, label: '項目2', quantity: 0, percentage: 50, ratioPart: 1 }
+            ];
+            renderItems();
+            updateUI(); // 初期UI更新
+            calculate();
+        }
+
+        // メッセージボックスを表示する関数
+        function showMessage(message, type = 'error', duration = 3000) {
+            messageBox.textContent = message;
+            messageBox.style.backgroundColor = type === 'error' ? '#ef4444' : '#22c55e'; // 赤 or 緑
+            messageBox.classList.add('show');
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, duration);
+        }
+
+        // 項目のHTMLをレンダリング
+        function renderItems() {
+            itemsContainer.innerHTML = ''; // 一度クリアして再描画
+            items.forEach((item) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.id = `item-${item.id}`;
+                itemDiv.className = 'flex flex-col sm:flex-row items-center gap-4 bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200';
+                itemDiv.innerHTML = `
+                    <input type="text" id="itemLabel-${item.id}" value="${item.label}" class="w-full sm:w-32 p-2 border border-gray-300 rounded-md focus:ring-gray-500 focus:border-gray-500 text-lg" placeholder="項目名">
+                    <div class="flex-grow flex items-center gap-2">
+                        <label for="itemQuantity-${item.id}" class="text-gray-700 text-lg">量:</label>
+                        <input type="number" id="itemQuantity-${item.id}" value="${item.quantity}" class="w-24 p-2 border rounded-md text-lg item-quantity-input">
+                        <input type="range" id="itemQuantitySlider-${item.id}" min="0" max="500" value="${item.quantity}" class="flex-grow h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer item-quantity-slider">
+                    </div>
+                    <div class="flex-grow flex items-center gap-2 item-percentage-group">
+                        <label for="itemPercentage-${item.id}" class="text-gray-700 text-lg">割合 (%):</label>
+                        <input type="number" id="itemPercentage-${item.id}" value="${item.percentage}" class="w-24 p-2 border rounded-md text-lg item-percentage-input">
+                        <input type="range" id="itemPercentageSlider-${item.id}" min="0" max="100" value="${item.percentage}" class="flex-grow h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer item-percentage-slider">
+                    </div>
+                    <div class="flex-grow flex items-center gap-2 item-ratio-part-group">
+                        <label for="itemRatioPart-${item.id}" class="text-gray-700 text-lg">比率 (数):</label>
+                        <input type="number" id="itemRatioPart-${item.id}" value="${item.ratioPart}" class="w-24 p-2 border rounded-md text-lg item-ratio-part-input">
+                        <input type="range" id="itemRatioPartSlider-${item.id}" min="0" max="15" value="${item.ratioPart}" class="flex-grow h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer item-ratio-part-slider">
+                    </div>
+                    <button class="remove-item-specific-btn px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75" data-item-id="${item.id}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                    </button>
+                `;
+                itemsContainer.appendChild(itemDiv);
+
+                // イベントリスナーをアタッチ
+                document.getElementById(`itemLabel-${item.id}`).addEventListener('input', calculate);
+                document.getElementById(`itemQuantity-${item.id}`).addEventListener('input', (e) => {
+                    document.getElementById(`itemQuantitySlider-${item.id}`).value = e.target.value;
+                    calculate();
+                });
+                document.getElementById(`itemQuantitySlider-${item.id}`).addEventListener('input', (e) => {
+                    document.getElementById(`itemQuantity-${item.id}`).value = e.target.value;
+                    calculate();
+                });
+                document.getElementById(`itemPercentage-${item.id}`).addEventListener('input', (e) => {
+                    document.getElementById(`itemPercentageSlider-${item.id}`).value = e.target.value;
+                    calculate();
+                });
+                document.getElementById(`itemPercentageSlider-${item.id}`).addEventListener('input', (e) => {
+                    document.getElementById(`itemPercentage-${item.id}`).value = e.target.value;
+                    calculate();
+                });
+                document.getElementById(`itemRatioPart-${item.id}`).addEventListener('input', (e) => {
+                    document.getElementById(`itemRatioPartSlider-${item.id}`).value = e.target.value;
+                    calculate();
+                });
+                document.getElementById(`itemRatioPartSlider-${item.id}`).addEventListener('input', (e) => {
+                    document.getElementById(`itemRatioPart-${item.id}`).value = e.target.value;
+                    calculate();
+                });
+
+                // 個別削除ボタンのイベントリスナー
+                const removeItemSpecificBtn = itemDiv.querySelector(`.remove-item-specific-btn`);
+                removeItemSpecificBtn.addEventListener('click', (e) => {
+                    const itemIdToRemove = parseInt(e.currentTarget.dataset.itemId);
+                    if (items.length > 1) { // 最低1項目は残す
+                        items = items.filter(item => item.id !== itemIdToRemove);
+                        renderItems(); // 再描画
+                        calculate(); // 再計算
+                    } else {
+                        showMessage('これ以上項目を減らすことはできません。', 'error');
+                    }
+                });
+            });
+            updateUI(); // 項目レンダリング後にUIを更新
+        }
+
+        // 入力フィールドのフォーカススタイルを更新するヘルパー関数
+        function updateInputFieldFocusStyle(inputElement, isEditable) {
+            inputElement.classList.remove('focus:ring-blue-500', 'focus:border-blue-500', 'focus:ring-gray-400', 'focus:border-gray-400');
+            if (isEditable) {
+                inputElement.classList.add('focus:ring-blue-500', 'focus:border-blue-500');
+            } else {
+                inputElement.classList.add('focus:ring-gray-400', 'focus:border-gray-400');
+            }
+        }
+
+        // UIの有効/無効状態を更新
+        function updateUI() {
+            // モードボタンの選択状態を更新
+            modeButtons.forEach(button => {
+                button.classList.remove('selected');
+            });
+            document.getElementById(`mode${currentMode}Btn`).classList.add('selected');
+
+            // 総量入力の初期状態を設定（読み取り専用、灰色枠線）
+            totalQuantityInput.readOnly = true;
+            totalQuantityInput.classList.add('bg-gray-100');
+            totalQuantityInput.classList.remove('border-blue-300');
+            totalQuantityInput.classList.add('border-gray-300');
+            totalQuantitySlider.disabled = true;
+            totalQuantitySlider.classList.add('opacity-50', 'cursor-not-allowed');
+            updateInputFieldFocusStyle(totalQuantityInput, false); // フォーカススタイルも更新
+
+            const allPercentageGroups = document.querySelectorAll('.item-percentage-group');
+            const allRatioPartGroups = document.querySelectorAll('.item-ratio-part-group');
+
+            // Hide/Show ratio/percentage groups based on selection
+            if (currentRatioInputType === 'percentage') {
+                allPercentageGroups.forEach(group => group.style.display = 'flex');
+                allRatioPartGroups.forEach(group => group.style.display = 'none');
+            } else { // currentRatioInputType === 'ratio'
+                allPercentageGroups.forEach(group => group.style.display = 'none');
+                allRatioPartGroups.forEach(group => group.style.display = 'flex');
+            }
+
+            // Set readOnly/disabled based on current mode and input type for each item
+            items.forEach((item, index) => {
+                const quantityInput = document.getElementById(`itemQuantity-${item.id}`);
+                const quantitySlider = document.getElementById(`itemQuantitySlider-${item.id}`);
+                const percentageInput = document.getElementById(`itemPercentage-${item.id}`);
+                const percentageSlider = document.getElementById(`itemPercentageSlider-${item.id}`);
+                const ratioPartInput = document.getElementById(`itemRatioPart-${item.id}`);
+                const ratioPartSlider = document.getElementById(`itemRatioPartSlider-${item.id}`); // New: Ratio Part Slider
+
+                // Default all item inputs to readOnly
+                quantityInput.readOnly = true;
+                quantityInput.classList.add('bg-gray-100');
+                quantitySlider.disabled = true;
+                quantitySlider.classList.add('opacity-50', 'cursor-not-allowed');
+                updateInputFieldFocusStyle(quantityInput, false);
+
+                percentageInput.readOnly = true;
+                percentageInput.classList.add('bg-gray-100');
+                percentageSlider.disabled = true;
+                percentageSlider.classList.add('opacity-50', 'cursor-not-allowed');
+                updateInputFieldFocusStyle(percentageInput, false);
+
+                ratioPartInput.readOnly = true;
+                ratioPartInput.classList.add('bg-gray-100');
+                ratioPartSlider.disabled = true; // New: Disable ratio part slider by default
+                ratioPartSlider.classList.add('opacity-50', 'cursor-not-allowed'); // New: Add disabled style
+                updateInputFieldFocusStyle(ratioPartInput, false);
+
+                // Enable inputs based on mode and selected ratio type
+                switch (currentMode) {
+                    case 1: // 総量と割合から量を算出
+                        totalQuantityInput.readOnly = false;
+                        totalQuantityInput.classList.remove('bg-gray-100', 'border-gray-300');
+                        totalQuantityInput.classList.add('border-blue-300'); // 青い枠線に戻す
+                        totalQuantitySlider.disabled = false;
+                        totalQuantitySlider.classList.remove('opacity-50', 'cursor-not-allowed');
+                        updateInputFieldFocusStyle(totalQuantityInput, true); // フォーカススタイルも更新
+
+                        if (currentRatioInputType === 'percentage') {
+                            percentageInput.readOnly = false;
+                            percentageInput.classList.remove('bg-gray-100');
+                            percentageSlider.disabled = false;
+                            percentageSlider.classList.remove('opacity-50', 'cursor-not-allowed');
+                            updateInputFieldFocusStyle(percentageInput, true);
+                        } else { // currentRatioInputType === 'ratio'
+                            ratioPartInput.readOnly = false;
+                            ratioPartInput.classList.remove('bg-gray-100');
+                            ratioPartSlider.disabled = false; // New: Enable ratio part slider
+                            ratioPartSlider.classList.remove('opacity-50', 'cursor-not-allowed'); // New: Remove disabled style
+                            updateInputFieldFocusStyle(ratioPartInput, true);
+                        }
+                        break;
+                    case 2: // 割合と1項目から他を算出
+                        // Only the first item's quantity is editable
+                        if (index === 0) {
+                            quantityInput.readOnly = false;
+                            quantityInput.classList.remove('bg-gray-100');
+                            quantitySlider.disabled = false;
+                            quantitySlider.classList.remove('opacity-50', 'cursor-not-allowed');
+                            updateInputFieldFocusStyle(quantityInput, true);
+                        }
+
+                        if (currentRatioInputType === 'percentage') {
+                            percentageInput.readOnly = false;
+                            percentageInput.classList.remove('bg-gray-100');
+                            percentageSlider.disabled = false;
+                            percentageSlider.classList.remove('opacity-50', 'cursor-not-allowed');
+                            updateInputFieldFocusStyle(percentageInput, true);
+                        } else { // currentRatioInputType === 'ratio'
+                            ratioPartInput.readOnly = false;
+                            ratioPartInput.classList.remove('bg-gray-100');
+                            ratioPartSlider.disabled = false; // New: Enable ratio part slider
+                            ratioPartSlider.classList.remove('opacity-50', 'cursor-not-allowed'); // New: Remove disabled style
+                            updateInputFieldFocusStyle(ratioPartInput, true);
+                        }
+                        break;
+                    case 3: // 各項目から総量と割合を算出
+                        quantityInput.readOnly = false;
+                        quantityInput.classList.remove('bg-gray-100');
+                        quantitySlider.disabled = false;
+                        quantitySlider.classList.remove('opacity-50', 'cursor-not-allowed');
+                        updateInputFieldFocusStyle(quantityInput, true);
+                        // Percentage and RatioPart remain readOnly as they are outputs
+                        break;
+                }
+            });
+        }
+
+        // 最大公約数を求めるヘルパー関数
+        function gcd(a, b) {
+            return b === 0 ? a : gcd(b, a % b);
+        }
+
+        // 数値の配列を比率に簡略化するヘルパー関数
+        function simplifyNumbersToRatio(numbers) {
+            if (numbers.length === 0) return [];
+            const nonZeroNumbers = numbers.filter(n => n > 0);
+            if (nonZeroNumbers.length === 0) return numbers.map(() => 0); // 全て0なら0のまま
+
+            // 小数点を考慮するため、一旦整数に変換してGCDを計算
+            const scale = 1000; // 例: 3桁の小数点以下まで考慮
+            const scaledNumbers = numbers.map(n => Math.round(n * scale));
+
+            let resultGcd = scaledNumbers[0];
+            for (let i = 1; i < scaledNumbers.length; i++) {
+                resultGcd = gcd(resultGcd, scaledNumbers[i]);
+            }
+
+            // 元のスケールに戻して、最も簡単な整数比率にする
+            return numbers.map(n => (n === 0 ? 0 : Math.round(n * scale / resultGcd)));
+        }
+
+        // 計算ロジック
+        function calculate() {
+            let totalQuantity = 0; // Will be read from input or calculated
+            let inputTotalQuantity = 0;
+
+            // Step 1: Read values from DOM for currently editable fields
+            if (!totalQuantityInput.readOnly) {
+                inputTotalQuantity = parseFloat(totalQuantityInput.value) || 0;
+            }
+
+            // Create temporary arrays to store current input values from DOM
+            const currentQuantities = [];
+            const currentPercentages = [];
+            const currentRatioParts = [];
+
+            items.forEach(item => {
+                const quantityInput = document.getElementById(`itemQuantity-${item.id}`);
+                const percentageInput = document.getElementById(`itemPercentage-${item.id}`);
+                const ratioPartInput = document.getElementById(`itemRatioPart-${item.id}`);
+
+                currentQuantities.push(parseFloat(quantityInput.value) || 0);
+                currentPercentages.push(parseFloat(percentageInput.value) || 0);
+                currentRatioParts.push(parseFloat(ratioPartInput.value) || 0);
+            });
+
+            // Step 2: Determine effective input values for the current mode
+            let effectiveQuantities = [...currentQuantities]; // Quantities used for calculation
+            let effectivePercentages = []; // Percentages used for calculation and chart
+            let effectiveRatioParts = [...currentRatioParts]; // Ratio parts used for calculation
+
+            let sumOfInputQuantities = 0;
+            let sumOfInputPercentages = 0;
+            let sumOfInputRatioParts = 0;
+
+            // Populate effective inputs based on mode and current editable state
+            switch (currentMode) {
+                case 1: // 総量と割合から量を算出
+                    totalQuantity = inputTotalQuantity; // totalQuantity is an input
+                    if (currentRatioInputType === 'percentage') {
+                        effectivePercentages = [...currentPercentages];
+                        sumOfInputPercentages = effectivePercentages.reduce((sum, val) => sum + val, 0);
+                        if (sumOfInputPercentages !== 100 && sumOfInputPercentages !== 0) {
+                            showMessage(`割合の合計が100%ではありません (${sumOfInputPercentages.toFixed(2)}%)。自動調整されます。`, 'warning');
+                            effectivePercentages = effectivePercentages.map(p => (p / sumOfInputPercentages) * 100);
+                        }
+                    } else { // currentRatioInputType === 'ratio'
+                        effectiveRatioParts = [...currentRatioParts];
+                        sumOfInputRatioParts = effectiveRatioParts.reduce((sum, val) => sum + val, 0);
+                        if (sumOfInputRatioParts === 0) {
+                            showMessage('比率の合計が0です。各項目の比率に0より大きい値を入力してください。', 'error');
+                            effectivePercentages = items.map(() => 0);
+                        } else {
+                            effectivePercentages = effectiveRatioParts.map(rp => (rp / sumOfInputRatioParts) * 100);
+                        }
+                    }
+                    break;
+                case 2: // 割合と1項目から他を算出
+                    totalQuantity = 0; // totalQuantity is an output
+                    effectiveQuantities[0] = currentQuantities[0]; // First item quantity is input
+
+                    if (currentRatioInputType === 'percentage') {
+                        effectivePercentages = [...currentPercentages];
+                        sumOfInputPercentages = effectivePercentages.reduce((sum, val) => sum + val, 0);
+                        if (sumOfInputPercentages !== 100 && sumOfInputPercentages !== 0) {
+                            showMessage(`割合の合計が100%ではありません (${sumOfInputPercentages.toFixed(2)}%)。自動調整されます。`, 'warning');
+                            effectivePercentages = effectivePercentages.map(p => (p / sumOfInputPercentages) * 100);
+                        }
+                    } else { // currentRatioInputType === 'ratio'
+                        effectiveRatioParts = [...currentRatioParts];
+                        sumOfInputRatioParts = effectiveRatioParts.reduce((sum, val) => sum + val, 0);
+                        if (sumOfInputRatioParts === 0) {
+                            showMessage('比率の合計が0です。各項目の比率に0より大きい値を入力してください。', 'error');
+                            effectivePercentages = items.map(() => 0);
+                        } else {
+                            effectivePercentages = effectiveRatioParts.map(rp => (rp / sumOfInputRatioParts) * 100);
+                        }
+                    }
+                    break;
+                case 3: // 各項目から総量と割合を算出
+                    totalQuantity = 0; // totalQuantity is an output
+                    // effectiveQuantities are already populated from currentQuantities
+                    sumOfInputQuantities = effectiveQuantities.reduce((sum, val) => sum + val, 0);
+                    break;
+            }
+
+            // Step 3: Perform calculations using effective input values
+            switch (currentMode) {
+                case 1: // 総量と割合から量を算出
+                    items.forEach((item, index) => {
+                        item.quantity = totalQuantity * (effectivePercentages[index] / 100);
+                        item.percentage = effectivePercentages[index]; // Store calculated percentage
+                        // Also calculate ratioPart for display if needed
+                        if (totalQuantity > 0) {
+                            const quantitiesForRatio = items.map(i => i.quantity);
+                            const simplifiedRatioParts = simplifyNumbersToRatio(quantitiesForRatio);
+                            item.ratioPart = simplifiedRatioParts[index];
+                        } else {
+                            item.ratioPart = 0;
+                        }
+                    });
+                    break;
+                case 2: // 割合と1項目から他を算出
+                    const referenceQuantity = effectiveQuantities[0];
+                    const referencePercentage = effectivePercentages[0];
+
+                    if (referenceQuantity > 0 && referencePercentage > 0) {
+                        totalQuantity = referenceQuantity / (referencePercentage / 100);
+                        items.forEach((item, index) => {
+                            if (index !== 0) { // Calculate quantity for other items
+                                item.quantity = totalQuantity * (effectivePercentages[index] / 100);
+                            }
+                            item.percentage = effectivePercentages[index]; // Store calculated percentage
+                            // Also calculate ratioPart for display if needed
+                            if (totalQuantity > 0) {
+                                const quantitiesForRatio = items.map(i => i.quantity);
+                                const simplifiedRatioParts = simplifyNumbersToRatio(quantitiesForRatio);
+                                item.ratioPart = simplifiedRatioParts[index];
+                            } else {
+                                item.ratioPart = 0;
+                            }
+                        });
+                    } else {
+                        totalQuantity = 0;
+                        items.forEach((item, index) => {
+                            item.quantity = 0;
+                            item.percentage = effectivePercentages[index]; // Still store effective percentage
+                            item.ratioPart = 0;
+                        });
+                    }
+                    break;
+                case 3: // 各項目から総量と割合を算出
+                    totalQuantity = sumOfInputQuantities; // totalQuantity is calculated from input quantities
+
+                    if (totalQuantity > 0) {
+                        items.forEach((item, index) => {
+                            item.quantity = effectiveQuantities[index]; // Store input quantity
+                            item.percentage = (item.quantity / totalQuantity) * 100;
+                        });
+                        // Calculate ratioPart from quantities
+                        const quantitiesForRatio = items.map(i => i.quantity);
+                        const simplifiedRatioParts = simplifyNumbersToRatio(quantitiesForRatio);
+                        items.forEach((item, index) => {
+                            item.ratioPart = simplifiedRatioParts[index];
+                        });
+                    } else {
+                        items.forEach((item, index) => {
+                            item.quantity = effectiveQuantities[index]; // Store input quantity
+                            item.percentage = 0;
+                            item.ratioPart = 0;
+                        });
+                    }
+                    break;
+            }
+
+            // Step 4: Update DOM for output fields
+            // Update total quantity
+            if (totalQuantityInput.readOnly) {
+                totalQuantityInput.value = totalQuantity.toFixed(2);
+                totalQuantitySlider.value = totalQuantity.toFixed(2);
+            }
+
+            items.forEach((item) => {
+                const quantityInput = document.getElementById(`itemQuantity-${item.id}`);
+                const quantitySlider = document.getElementById(`itemQuantitySlider-${item.id}`);
+                const percentageInput = document.getElementById(`itemPercentage-${item.id}`);
+                const percentageSlider = document.getElementById(`itemPercentageSlider-${item.id}`);
+                const ratioPartInput = document.getElementById(`itemRatioPart-${item.id}`);
+                const ratioPartSlider = document.getElementById(`itemRatioPartSlider-${item.id}`); // New: Ratio Part Slider
+
+                if (quantityInput.readOnly) {
+                    quantityInput.value = item.quantity.toFixed(2);
+                    quantitySlider.value = item.quantity.toFixed(2);
+                }
+                if (percentageInput.readOnly) {
+                    percentageInput.value = item.percentage.toFixed(2);
+                    percentageSlider.value = item.percentage.toFixed(2);
+                }
+                if (ratioPartInput.readOnly) {
+                    ratioPartInput.value = item.ratioPart.toFixed(0);
+                    ratioPartSlider.value = item.ratioPart.toFixed(0); // New: Update slider value
+                }
+            });
+
+            drawPieChart(items, totalQuantity);
+        }
+
+        // 円グラフ描画
+        function drawPieChart(data, total) {
+            ctx.clearRect(0, 0, pieChartCanvas.width, pieChartCanvas.height);
+            const centerX = pieChartCanvas.width / 2;
+            const centerY = pieChartCanvas.height / 2;
+            const radius = Math.min(centerX, centerY) * 0.7; // 半径を調整
+
+            let startAngle = 0;
+            const colors = [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                '#FF9F40', '#E7E9ED', '#8AC926', '#1982C4', '#6A4C93'
+            ]; // 項目ごとの色
+
+            // グラフデータがない場合
+            if (data.length === 0 || total === 0) {
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = '#E0E0E0'; // 灰色
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#B0B0B0';
+                ctx.stroke();
+                selectedSliceInfo.textContent = 'グラフデータがありません。';
+                return;
+            }
+
+            // グラフ描画に使用する割合の合計を計算 (小数点誤差を考慮)
+            let sumOfDisplayPercentages = data.reduce((sum, item) => sum + item.percentage, 0);
+
+            // 割合の合計が0の場合の処理
+            if (sumOfDisplayPercentages === 0) {
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = '#E0E0E0'; // 灰色
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#B0B0B0';
+                ctx.stroke();
+                selectedSliceInfo.textContent = '割合の合計が0です。';
+                return;
+            }
+
+            // クリックイベントのためのスライス情報保存
+            pieChartCanvas.slices = [];
+
+            // 各スライスを描画
+            data.forEach((item, index) => {
+                // 表示用の割合を正規化
+                const sliceAngle = (item.percentage / sumOfDisplayPercentages) * 2 * Math.PI;
+                const endAngle = startAngle + sliceAngle;
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[index % colors.length];
+                ctx.fill();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#fff'; // スライス間の境界線
+                ctx.stroke();
+
+                // スライス情報を保存
+                pieChartCanvas.slices.push({
+                    startAngle: startAngle,
+                    endAngle: endAngle,
+                    label: item.label,
+                    quantity: item.quantity,
+                    percentage: item.percentage
+                });
+
+                // テキストラベル (中心から少し離れた位置)
+                const textAngle = startAngle + sliceAngle / 2;
+                const textX = centerX + radius * 0.65 * Math.cos(textAngle);
+                const textY = centerY + radius * 0.65 * Math.sin(textAngle);
+
+                ctx.fillStyle = 'white';
+                ctx.font = '14px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                if (item.percentage > 0) { // 割合が0の場合は表示しない
+                    ctx.fillText(`${item.percentage.toFixed(1)}%`, textX, textY);
+                }
+
+                startAngle = endAngle;
+            });
+
+            selectedSliceInfo.textContent = 'グラフの項目をクリックすると詳細が表示されます。';
+        }
+
+        // 円グラフクリックイベント
+        pieChartCanvas.addEventListener('click', (e) => {
+            const rect = pieChartCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const centerX = pieChartCanvas.width / 2;
+            const centerY = pieChartCanvas.height / 2;
+            const dx = mouseX - centerX;
+            const dy = mouseY - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const radius = Math.min(centerX, centerY) * 0.7;
+
+            if (distance <= radius) {
+                let angle = Math.atan2(dy, dx);
+                if (angle < 0) angle += 2 * Math.PI; // 0から2πの範囲に調整
+
+                let foundSlice = false;
+                // Fix: Check if pieChartCanvas.slices is defined before iterating
+                if (pieChartCanvas.slices) {
+                    for (const slice of pieChartCanvas.slices) {
+                        if (angle >= slice.startAngle && angle < slice.endAngle) {
+                            selectedSliceInfo.innerHTML = `
+                                <p class="text-xl font-bold mb-2">${slice.label}</p>
+                                <p>量: <span class="font-semibold text-blue-700">${slice.quantity.toFixed(2)}</span></p>
+                                <p>割合: <span class="font-semibold text-blue-700">${slice.percentage.toFixed(2)}%</span></p>
+                            `;
+                            foundSlice = true;
+                            break;
+                        }
+                    }
+                }
+                if (!foundSlice) {
+                    selectedSliceInfo.textContent = 'グラフの項目をクリックすると詳細が表示されます。';
+                }
+            } else {
+                selectedSliceInfo.textContent = 'グラフの項目をクリックすると詳細が表示されます。';
+            }
+        });
+
+        // イベントリスナー設定
+        mode1Btn.addEventListener('click', () => { currentMode = 1; updateUI(); calculate(); });
+        mode2Btn.addEventListener('click', () => { currentMode = 2; updateUI(); calculate(); });
+        mode3Btn.addEventListener('click', () => { currentMode = 3; updateUI(); calculate(); });
+
+        radioPercentage.addEventListener('change', () => { currentRatioInputType = 'percentage'; updateUI(); calculate(); });
+        radioRatio.addEventListener('change', () => { currentRatioInputType = 'ratio'; updateUI(); calculate(); });
+
+        totalQuantityInput.addEventListener('input', calculate);
+        totalQuantitySlider.addEventListener('input', () => {
+            totalQuantityInput.value = totalQuantitySlider.value;
+            calculate();
+        });
+
+        addItemBtn.addEventListener('click', () => {
+            const newId = items.length > 0 ? Math.max(...items.map(item => item.id)) + 1 : 1;
+            items.push({ id: newId, label: `項目${newId}`, quantity: 0, percentage: 0, ratioPart: 1 });
+            renderItems();
+            calculate();
+        });
+
+        // モーダル表示/非表示のイベントリスナー
+        helpButton.addEventListener('click', () => {
+            helpModal.classList.remove('hidden');
+        });
+
+        closeModalButton.addEventListener('click', () => {
+            helpModal.classList.add('hidden');
+        });
+
+        // モーダルの外側をクリックして閉じる
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) {
+                helpModal.classList.add('hidden');
+            }
+        });
+
+        // 初期化
+        initializeItems();
+    </script>
+</body>
+</html>
